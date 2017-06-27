@@ -106,10 +106,14 @@ def update_maze(load_maze, change_values, maze):
 
     return maze
 
-def forward_pass(maze, prob):
+def forward_pass(plot_maze, maze, prob):
     path = np.array([[maze.shape[0]/2,0]], dtype=np.uint16)
     steps = 0
     while maze[path[-1,0], path[-1,1]] > 1:
+        # show agent position in maze
+        if plot_maze == True:
+            show_position(np.zeros((maze.shape[0], maze.shape[1])) + maze, path[-1], steps)
+
         counter = 0
         random_number = np.random.rand(1)
         if random_number < (prob[path[steps,0],path[steps,1],0] + counter) and random_number >= counter:
@@ -150,6 +154,18 @@ def forward_pass(maze, prob):
     reward = maze[path[steps,0], path[steps,1]]
 
     return path, reward, steps
+
+def show_position(maze, position, steps):
+    maze = maze
+    maze[maze == 2] = -2
+    maze[maze == 1] = -3
+    if steps == 0:
+        maze[position[0], position[1]] = -10
+    else:
+        maze[position[0], position[1]] = -5
+    plt.imshow(maze, interpolation='nearest')
+    plt.pause(0.0000001)
+    plt.clf()
 
 def save_policy(prob, iterations):
     optimal_policy = np.zeros((prob.shape[0], prob.shape[1]), dtype=np.uint16)
@@ -283,11 +299,12 @@ def softmax(maze, prob, path, steps, gain):
 
     return prob
 
-def main(load_maze, change_values, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor):
+def main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor):
     '''
 
     :param load_maze: if True, load previously used maze, else create new maze
     :param change_values: if True, change reward values at num_iterations / 2, else maintain current values
+    :param plot_maze: if True, display agent position in maze
     :param x_row: Number of rows in the maze
     :param y_row: Number of columns in the maze
     :param prob_not_wall: The probability that a block will not be a wall
@@ -303,6 +320,10 @@ def main(load_maze, change_values, x_row, y_row, prob_not_wall, prob_reward, num
     :return: None
 
     '''
+
+    # interactive feature of matplotlib
+    if plot_maze == True:
+        plt.ion()
 
     # initialize maze
     maze = create_maze(load_maze, x_row, y_row, prob_not_wall, prob_reward)
@@ -320,7 +341,7 @@ def main(load_maze, change_values, x_row, y_row, prob_not_wall, prob_reward, num
             maze = update_maze(load_maze, change_values, maze)
 
         #forward pass
-        path, reward, steps = forward_pass(maze, prob)
+        path, reward, steps = forward_pass(plot_maze, maze, prob)
         if iterations == (num_iterations-1) or iterations == int(num_iterations/2-1):
             save_policy(prob, iterations)
             save_path(path, iterations)
@@ -333,6 +354,7 @@ if __name__ == "__main__":
     # parameters
     load_maze = True
     change_values = True
+    plot_maze = False
     x_row = 9
     y_row = 6
     prob_not_wall = 0.75
@@ -349,6 +371,6 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Novel reinforcement learning algorithm
-    main(load_maze, change_values, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor)
+    main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor)
 
     print("--- %s seconds ---" % (time.time() - start_time))
