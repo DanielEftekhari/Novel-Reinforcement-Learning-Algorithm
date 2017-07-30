@@ -35,7 +35,7 @@ def create_maze(load_maze, x_row, y_row, prob_not_wall, prob_reward):
     else:
         maze = np.loadtxt('maze1.txt')
 
-    save_maze((np.zeros(np.shape(maze))) + maze, 1)
+    save_maze(np.copy(maze), 1)
 
     return maze
 
@@ -102,7 +102,7 @@ def update_maze(load_maze, change_values, maze):
         np.savetxt('maze2.txt', (maze), fmt="%f")
     else:
         maze = np.loadtxt('maze2.txt')
-    save_maze((np.zeros(np.shape(maze))) + maze, 2)
+    save_maze(np.copy(maze), 2)
 
     return maze
 
@@ -112,7 +112,7 @@ def forward_pass(plot_maze, maze, prob):
     while maze[path[-1,0], path[-1,1]] > 1:
         # show agent position in maze
         if plot_maze == True:
-            show_position(np.zeros((maze.shape[0], maze.shape[1])) + maze, path[-1], steps)
+            show_position(np.copy(maze), path[-1], steps)
 
         counter = 0
         random_number = np.random.rand(1)
