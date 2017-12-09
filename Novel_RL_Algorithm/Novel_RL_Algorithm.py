@@ -15,26 +15,25 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 
-def create_maze(load_maze, x_row, y_row, prob_not_wall, prob_reward):
+def create_maze(load_maze, shape, prob_not_wall, prob_reward):
     if load_maze == False:
-        maze = np.random.uniform(0, 1, (x_row, y_row))
+        maze = np.random.uniform(0, 1, (shape[0], shape[1]))
         maze = (maze > prob_not_wall)
         maze = maze.astype(np.float32)
         maze[:,0] = 1
-        maze[int(x_row/2)-1:int(x_row/2)+2,0] = 0
+        maze[int(shape[0]/2)-1:int(shape[0]/2)+2,0] = 0
 
-        for i in range(maze.shape[0]):
-            for j in range(2, maze.shape[1]):
-                if maze[i,j] != 1:
-                    random_number = np.random.rand(1)
-                    if random_number < prob_reward:
-                        maze[i,j] = np.random.uniform(0, 1)
+        maze_area = np.copy(maze[:,2:])
+        uniform = np.random.uniform(0, 1, (shape[0], shape[1]-2))
+        rand = np.random.rand(shape[0], shape[1]-2)
+        rand = (rand < prob_reward)
+        maze_area[(maze_area != 1) * (rand == True)] = uniform[(maze_area != 1) * (rand == True)]
+        maze[:,2:]= maze_area
 
         maze[maze == 0] = 2
         np.savetxt('maze1.txt', (maze), fmt="%f")
     else:
         maze = np.loadtxt('maze1.txt')
-
     save_maze(np.copy(maze), 1)
 
     return maze
@@ -46,8 +45,7 @@ def save_maze(maze, number):
     plt.imshow(maze, interpolation='nearest')
     plt.savefig('maze' + str(number) + '.png')
 
-def initialize_prob(maze):
-    shape = np.shape(maze)
+def initialize_prob(maze, shape):
     prob = np.zeros((shape[0], shape[1], 4))
     for i in range(shape[0]):
         for j in range(shape[1]):
@@ -92,13 +90,11 @@ def initialize_prob(maze):
 
     return prob
 
-def update_maze(load_maze, change_values, maze):
+def update_maze(load_maze, change_values, maze, shape):
     if load_maze == False:
         if change_values == True:
-            for i in range(maze.shape[0]):
-                for j in range(maze.shape[1]):
-                    if maze[i,j] < 1:
-                        maze[i,j] = np.random.uniform(0, 1)
+            uniform = np.random.uniform(0, 1, (shape[0], shape[1]))
+            maze[maze < 1] = uniform[maze < 1]
         np.savetxt('maze2.txt', (maze), fmt="%f")
     else:
         maze = np.loadtxt('maze2.txt')
@@ -106,8 +102,8 @@ def update_maze(load_maze, change_values, maze):
 
     return maze
 
-def forward_pass(plot_maze, maze, prob):
-    path = np.array([[maze.shape[0]/2,0]], dtype=np.uint16)
+def forward_pass(plot_maze, maze, shape, prob):
+    path = np.array([[int(shape[0]/2),0]], dtype=np.uint16)
     steps = 0
     while maze[path[-1,0], path[-1,1]] > 1:
         # show agent position in maze
@@ -168,14 +164,11 @@ def show_position(maze, position, steps):
     plt.clf()
 
 def save_policy(prob, iterations):
-    optimal_policy = np.zeros((prob.shape[0], prob.shape[1]), dtype=np.uint16)
-    for i in range(prob.shape[0]):
-        for j in range(prob.shape[1]):
-            optimal_policy[i,j] = np.argmax(np.array([prob[i,j,0],prob[i,j,1],prob[i,j,2],prob[i,j,3]]))
-    np.savetxt('optimal_policy' + str(iterations) + '.txt', (optimal_policy), fmt="%d")
+    optimal_policy = np.argmax(prob, axis=-1)
+    np.savetxt('optimal_policy' + str(iterations) + '.txt', (optimal_policy), fmt="%d", newline='\r\n')
 
 def save_path(path, iterations):
-    np.savetxt('path' + str(iterations) + '.txt', (path), fmt="%d")
+    np.savetxt('path' + str(iterations) + '.txt', (path), fmt="%d", newline='\r\n')
 
 def backward_pass(maze, prob, path, steps, reward, alpha, discount_steps, gain):
     counter = 0
@@ -299,7 +292,7 @@ def softmax(maze, prob, path, steps, gain):
 
     return prob
 
-def main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor):
+def main(load_maze, change_values, plot_maze, x_dim, y_dim, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor):
     '''
 
     :param load_maze: if True, load previously used maze, else create new maze
@@ -326,10 +319,11 @@ def main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_
         plt.ion()
 
     # initialize maze
-    maze = create_maze(load_maze, x_row, y_row, prob_not_wall, prob_reward)
+    shape = [x_dim, y_dim]
+    maze = create_maze(load_maze, shape, prob_not_wall, prob_reward)
 
     # initialize probabilities
-    prob = initialize_prob(maze)
+    prob = initialize_prob(maze, shape)
 
     # Begin experiment
     gain2 = gain
@@ -338,15 +332,15 @@ def main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_
             print(iterations)
         if iterations == int(num_iterations/2-1):
             gain = gain2
-            maze = update_maze(load_maze, change_values, maze)
+            maze = update_maze(load_maze, change_values, maze, shape)
 
-        #forward pass
-        path, reward, steps = forward_pass(plot_maze, maze, prob)
+        # forward pass
+        path, reward, steps = forward_pass(plot_maze, maze, shape, prob)
         if iterations == (num_iterations-1) or iterations == int(num_iterations/2-1):
             save_policy(prob, iterations)
             save_path(path, iterations)
 
-        #backward pass
+        # backward pass
         prob = backward_pass(maze, prob, path, steps, reward, alpha, discount_steps, gain)
         gain *= gain_factor
 
@@ -355,8 +349,8 @@ if __name__ == "__main__":
     load_maze = True
     change_values = True
     plot_maze = False
-    x_row = 9
-    y_row = 6
+    x_dim = 9
+    y_dim = 6
     prob_not_wall = 0.75
     prob_reward = 0.12
     num_iterations = 18000
@@ -371,6 +365,6 @@ if __name__ == "__main__":
     start_time = time.time()
 
     # Novel reinforcement learning algorithm
-    main(load_maze, change_values, plot_maze, x_row, y_row, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor)
+    main(load_maze, change_values, plot_maze, x_dim, y_dim, prob_not_wall, prob_reward, num_iterations, alpha, discount_steps, gain, gain_factor)
 
     print("--- %s seconds ---" % (time.time() - start_time))
